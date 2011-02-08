@@ -80,7 +80,7 @@ class UsbObserver extends UEventObserver {
             String switchState = event.get("SWITCH_STATE");
             if (switchState != null) {
                 try {
-                    int newConfig = Integer.parseInt(switchState);
+                    int newConfig = switchState.compareTo("online")==0 ? 1 : 0;
                     if (newConfig != mUsbConfig) {
                         mPreviousUsbConfig = mUsbConfig;
                         mUsbConfig = newConfig;
