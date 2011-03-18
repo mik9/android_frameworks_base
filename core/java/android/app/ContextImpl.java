@@ -77,6 +77,7 @@ import android.net.IThrottleManager;
 import android.net.Uri;
 import android.net.wifi.IWifiManager;
 import android.net.wifi.WifiManager;
+import android.nfc.NfcManager;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.DropBoxManager;
@@ -116,6 +117,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -174,6 +177,7 @@ class ContextImpl extends Context {
     private static ConnectivityManager sConnectivityManager;
     private static ThrottleManager sThrottleManager;
     private static WifiManager sWifiManager;
+    private static Object sWimaxController;
     private static LocationManager sLocationManager;
     private static final HashMap<String, SharedPreferencesImpl> sSharedPrefs =
             new HashMap<String, SharedPreferencesImpl>();
@@ -189,6 +193,7 @@ class ContextImpl extends Context {
     private Resources.Theme mTheme = null;
     private PackageManager mPackageManager;
     private NotificationManager mNotificationManager = null;
+    private ProfileManager mProfileManager = null;
     private ActivityManager mActivityManager = null;
     private WallpaperManager mWallpaperManager = null;
     private Context mReceiverRestrictedContext = null;
@@ -206,6 +211,7 @@ class ContextImpl extends Context {
     private DevicePolicyManager mDevicePolicyManager = null;
     private UiModeManager mUiModeManager = null;
     private DownloadManager mDownloadManager = null;
+    private NfcManager mNfcManager = null;
 
     private final Object mSync = new Object();
 
@@ -386,7 +392,8 @@ class ContextImpl extends Context {
             }
 
             Map map = null;
-            if (prefsFile.exists() && prefsFile.canRead()) {
+            FileStatus stat = new FileStatus();
+            if (FileUtils.getFileStatus(prefsFile.getPath(), stat) && prefsFile.canRead()) {
                 try {
                     FileInputStream str = new FileInputStream(prefsFile);
                     map = XmlUtils.readMapXml(str);
@@ -399,7 +406,7 @@ class ContextImpl extends Context {
                     Log.w(TAG, "getSharedPreferences", e);
                 }
             }
-            sp.replace(map);
+            sp.replace(map, stat);
         }
         return sp;
     }
@@ -956,8 +963,12 @@ class ContextImpl extends Context {
             return getThrottleManager();
         } else if (WIFI_SERVICE.equals(name)) {
             return getWifiManager();
+        } else if (WIMAX_SERVICE.equals(name)) {
+            return getWimaxController();
         } else if (NOTIFICATION_SERVICE.equals(name)) {
             return getNotificationManager();
+        } else if (PROFILE_SERVICE.equals(name)) {
+            return getProfileManager();
         } else if (KEYGUARD_SERVICE.equals(name)) {
             return new KeyguardManager();
         } else if (ACCESSIBILITY_SERVICE.equals(name)) {
@@ -995,6 +1006,8 @@ class ContextImpl extends Context {
             return getUiModeManager();
         } else if (DOWNLOAD_SERVICE.equals(name)) {
             return getDownloadManager();
+        } else if (NFC_SERVICE.equals(name)) {
+            return getNfcManager();
         }
 
         return null;
@@ -1079,6 +1092,37 @@ class ContextImpl extends Context {
         return sWifiManager;
     }
 
+    /*
+     * Use reflection hacks to get an instance of the WimaxController
+     */
+    private Object getWimaxController()
+    {
+        synchronized (sSync) {
+            if (sWimaxController == null) {
+                try {
+                    IBinder b = ServiceManager.getService(WIMAX_SERVICE);
+                    if (b != null) {
+                        Class<?> klass = Class.forName("com.htc.net.wimax.IWimaxController$Stub");
+                        if (klass != null) {
+                            Method asInterface = klass.getMethod("asInterface", IBinder.class);
+                            Object wc = asInterface.invoke(null, b);
+                            if (wc != null) {
+                                klass = Class.forName("com.htc.net.wimax.WimaxController");
+                                if (klass != null) {
+                                    Constructor<?> ctor = klass.getDeclaredConstructors()[1];
+                                    sWimaxController = ctor.newInstance(wc, mMainThread.getHandler());
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Unable to create WimaxController instance", e);
+                }
+            }
+        }
+        return sWimaxController;
+    }
+
     private NotificationManager getNotificationManager() {
         synchronized (mSync) {
             if (mNotificationManager == null) {
@@ -1088,6 +1132,16 @@ class ContextImpl extends Context {
             }
         }
         return mNotificationManager;
+    }
+
+    private ProfileManager getProfileManager() {
+        synchronized (mSync) {
+            if (mProfileManager == null) {
+                mProfileManager = new ProfileManager(getOuterContext(),
+                        mMainThread.getHandler());
+            }
+        }
+        return mProfileManager;
     }
 
     private WallpaperManager getWallpaperManager() {
@@ -1220,6 +1274,15 @@ class ContextImpl extends Context {
             }
         }
         return mDownloadManager;
+    }
+
+    private NfcManager getNfcManager() {
+        synchronized (mSync) {
+            if (mNfcManager == null) {
+                mNfcManager = new NfcManager(this);
+            }
+        }
+        return mNfcManager;
     }
 
     @Override
@@ -2714,15 +2777,6 @@ class ContextImpl extends Context {
             return PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
         }
 
-        @Override
-        public void setPackageObbPath(String packageName, String path) {
-            try {
-                mPM.setPackageObbPath(packageName, path);
-            } catch (RemoteException e) {
-                // Should never happen!
-            }
-        }
-
         private final ContextImpl mContext;
         private final IPackageManager mPM;
 
@@ -2797,11 +2851,15 @@ class ContextImpl extends Context {
             }
         }
 
-        public void replace(Map newContents) {
+        /* package */ void replace(Map newContents, FileStatus stat) {
             synchronized (this) {
                 mLoaded = true;
                 if (newContents != null) {
                     mMap = newContents;
+                }
+                if (stat != null) {
+                    mStatTimestamp = stat.mtime;
+                    mStatSize = stat.size;
                 }
             }
         }

@@ -64,6 +64,23 @@
          could not be performed because FDN is enabled. This will be displayed in a toast. -->
     <string name="mmiFdnError">Operation is restricted to fixed dialing numbers only.</string>
 
+    <!-- Names of default profiles. -->
+    <string name="profileNameDefault">Default</string>
+    <string name="profileNameWork">Work</string>
+    <string name="profileNameHome">Home</string>
+    <string name="profileNameSilent">Silent</string>
+    <string name="profileNameNight">Night</string>
+
+    <!-- Names of application groups. -->
+    <string name="profileGroupPhone">Phone</string>
+    <string name="profileGroupCalendar">Calendar</string>
+    <string name="profileGroupGmail">Gmail</string>
+    <string name="profileGroupEmail">Email</string>
+    <string name="profileGroupSMS">SMS</string>
+
+    <!-- Name of wildcard profile. -->
+    <string name="wildcardProfile">Other</string>
+
     <!-- Displayed when a phone feature such as call barring was activated. -->
     <string name="serviceEnabled">Service was enabled.</string>
     <!-- Displayed in front of the list of a set of service classes
@@ -307,6 +324,9 @@
 
     <!-- label for item that reboots the phone in phone options dialog -->
     <string name="global_action_reboot">Reboot</string>
+
+    <!-- label for item that reboots the phone in phone options dialog -->
+    <string name="global_action_choose_profile">Choose profile</string>
 
     <!-- label for item that enables silent mode in phone options dialog -->
     <string name="global_action_toggle_silent_mode">Silent mode</string>
@@ -1148,6 +1168,18 @@
       receive packets not directly addressed to your device.  This can be
       useful when discovering services offered near by.  It uses more power
       than the non-multicast mode.</string>
+
+    <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+    <string name="permlab_accessWimaxState">view WiMax state</string>
+    <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+    <string name="permdesc_accessWimaxState">Allows an application to view
+      the information about the state of WiMax.</string>
+
+    <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+    <string name="permlab_changeWimaxState">change WiMax state</string>
+    <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+    <string name="permdesc_changeWimaxState">Allows an application to connect
+      to and disconnect from WiMax Networks.</string>
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
     <string name="permlab_bluetoothAdmin">bluetooth administration</string>
@@ -2075,7 +2107,7 @@
     <!-- The default permission group for any permissions that have not explicitly set a group. -->
     <string name="default_permission_group">Default</string>
     <!-- Do not translate. -->
-    <string name="permissions_format"><xliff:g id="perm_line1">%1$s</xliff:g>, <xliff:g id="perm_line2">%2$s</xliff:g></string>
+    <string name="permissions_format" translatable="false"><xliff:g id="perm_line1">%1$s</xliff:g>, <xliff:g id="perm_line2">%2$s</xliff:g></string>
     <!-- Shown for an application when it doesn't require any permission grants. -->
     <string name="no_permissions">No permissions required</string>
     <!-- When installing an application, the less-dangerous permissions are hidden.  If the user showed those, this is the text to hide them again.  -->
@@ -2154,7 +2186,7 @@
     <!-- locale string based on mcc values.  By default (0-length string) we don't replace the %s   -->
     <!-- at all and later replace it with a locale string based on the users chosen locale          -->
     <!-- DO NOT TRANSLATE -->
-    <string name="locale_replacement">""</string>
+    <string name="locale_replacement" translatable="false">""</string>
 
     <!-- Title of the pop-up dialog in which the user switches input method components. -->
     <string name="select_input_method">Select input method</string>
@@ -2296,7 +2328,7 @@
     <string name="chooser_wallpaper">Change wallpaper</string>
 
     <!-- Do Not Translate: Alternate eri.xml -->
-    <string name="alternate_eri_file">/data/eri.xml</string>
+    <string name="alternate_eri_file" translatable="false">/data/eri.xml</string>
 
     <string name="pptp_vpn_description">Point-to-Point Tunneling Protocol</string>
     <string name="l2tp_vpn_description">Layer 2 Tunneling Protocol</string>

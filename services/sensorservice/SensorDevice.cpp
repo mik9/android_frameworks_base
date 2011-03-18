@@ -111,6 +111,11 @@ SensorDevice::SensorDevice()
 
     if (mSensorModule) {
 #ifdef ENABLE_SENSORS_COMPAT
+#ifdef SENSORS_NO_OPEN_CHECK
+        sensors_control_open(&mSensorModule->common, &mSensorControlDevice) ;
+        sensors_data_open(&mSensorModule->common, &mSensorDataDevice) ;
+        mOldSensorsCompatMode = true;
+#else
         if (!sensors_control_open(&mSensorModule->common, &mSensorControlDevice)) {
             if (sensors_data_open(&mSensorModule->common, &mSensorDataDevice)) {
                 LOGE("couldn't open data device in backwards-compat mode for module %s (%s)",
@@ -123,6 +128,7 @@ SensorDevice::SensorDevice()
             LOGE("couldn't open control device in backwards-compat mode for module %s (%s)",
                     SENSORS_HARDWARE_MODULE_ID, strerror(-err));
         }
+#endif
 #else
         err = sensors_open(&mSensorModule->common, &mSensorDevice);
         LOGE_IF(err, "couldn't open device for module %s (%s)",
@@ -162,9 +168,8 @@ void SensorDevice::dump(String8& result, char* buffer, size_t SIZE)
 
     Mutex::Autolock _l(mLock);
     for (size_t i=0 ; i<size_t(count) ; i++) {
-        snprintf(buffer, SIZE, "handle=0x%08x, active-count=%d / %d\n",
+        snprintf(buffer, SIZE, "handle=0x%08x, active-count=%d\n",
                 list[i].handle,
-                mActivationCount.valueFor(list[i].handle).count,
                 mActivationCount.valueFor(list[i].handle).rates.size());
         result.append(buffer);
     }
@@ -221,17 +226,24 @@ ssize_t SensorDevice::poll(sensors_event_t* buffer, size_t count) {
             buffer[pollsDone].acceleration = oldBuffer.vector;
             buffer[pollsDone].temperature = oldBuffer.temperature;
             LOGV("Adding results for sensor %d", buffer[pollsDone].sensor);
+            /* The ALS and PS sensors only report values on change,
+             * instead of a data "stream" like the others. So don't wait
+             * for the number of requested samples to fill, and deliver
+             * it immediately */
+            if (sensorType == SENSOR_TYPE_PROXIMITY) {
 #ifdef FOXCONN_SENSORS
             /* Fix ridiculous API breakages from FIH. */
             /* These idiots are returning -1 for FAR, and 1 for NEAR */
-            if (sensorType == SENSOR_TYPE_PROXIMITY) {
                 if (buffer[pollsDone].distance > 0) {
                     buffer[pollsDone].distance = 0;
                 } else {
                     buffer[pollsDone].distance = 1;
                 }
-            }
 #endif
+		return pollsDone+1;
+            } else if (sensorType == SENSOR_TYPE_LIGHT) {
+		return pollsDone+1;
+            }
             pollsDone++;
         }
         return pollsDone;
@@ -247,22 +259,25 @@ status_t SensorDevice::activate(void* ident, int handle, int enabled)
     bool actuateHardware = false;
 
     Info& info( mActivationCount.editValueFor(handle) );
-    int32_t& count(info.count);
     if (enabled) {
-        if (android_atomic_inc(&count) == 0) {
-            actuateHardware = true;
-        }
         Mutex::Autolock _l(mLock);
         if (info.rates.indexOfKey(ident) < 0) {
             info.rates.add(ident, DEFAULT_EVENTS_PERIOD);
+            actuateHardware = true;
+        } else {
+            // sensor was already activated for this ident
         }
     } else {
-        if (android_atomic_dec(&count) == 1) {
-            actuateHardware = true;
-        }
         Mutex::Autolock _l(mLock);
-        info.rates.removeItem(ident);
+        if (info.rates.removeItem(ident) >= 0) {
+            if (info.rates.size() == 0) {
+                actuateHardware = true;
+            }
+        } else {
+            // sensor wasn't enabled for this ident
+        }
     }
+
     if (actuateHardware) {
         if (mOldSensorsCompatMode) {
             if (enabled)
