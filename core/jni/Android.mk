@@ -148,6 +148,9 @@ ifeq ($(BOARD_HAVE_FM_RADIO),true)
 ifeq ($(BOARD_WLAN_DEVICE),bcm4329)
 	LOCAL_SRC_FILES += android_hardware_fm_bcm4325.cpp
 endif
+ifeq ($(BOARD_WLAN_DEVICE),bcm4325)
+	LOCAL_SRC_FILES += android_hardware_fm_bcm4325.cpp
+endif
 ifeq ($(BOARD_WLAN_DEVICE),wl1251)
 	LOCAL_SRC_FILES += android_hardware_fm_wl1271.cpp
 endif
