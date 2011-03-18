@@ -2091,10 +2091,12 @@ status_t SurfaceFlinger::turnElectronBeamOff(int32_t mode)
 status_t SurfaceFlinger::turnElectronBeamOnImplLocked(int32_t mode)
 {
     DisplayHardware& hw(graphicPlane(0).editDisplayHardware());
+#if 0
     if (hw.canDraw()) {
         // we're already on
         return NO_ERROR;
     }
+#endif
     if (mode & ISurfaceComposer::eElectronBeamAnimationOn) {
         electronBeamOnAnimationImplLocked();
     }
