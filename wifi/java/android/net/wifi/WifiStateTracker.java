@@ -1103,6 +1103,9 @@ public class WifiStateTracker extends NetworkStateTracker {
                  * network state change event comes first, followed by
                  * the supplicant state change event.
                  */
+ 
+                // Use wimax namespace because it's only we can get access without property service patching
+                SystemProperties.set("wimax.enable_wifi_pm","1");
                 NetworkStateChangeResult result =
                     (NetworkStateChangeResult) msg.obj;
 
