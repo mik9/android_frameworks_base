@@ -52,7 +52,6 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
-import android.os.SystemProperties;
 import android.os.WorkSource;
 import android.provider.Settings.SettingNotFoundException;
 import android.provider.Settings;
@@ -403,8 +402,6 @@ class PowerManagerService extends IPowerManager.Stub
                 mIsPowered = mBatteryService.isPowered();
 
                 if (mIsPowered != wasPowered) {
-                    // Use wimax namespace because it's only we can get access without property service patching
-                    SystemProperties.set("wimax.enable_wifi_pm","1");
                     // update mStayOnWhilePluggedIn wake lock
                     updateWakeLockLocked();
 
