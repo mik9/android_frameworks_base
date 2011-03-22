@@ -401,4 +401,9 @@
     <!-- Do not translate. Defines the slots is Two Digit Number for dialing normally not USSD -->
     <string-array name="config_twoDigitNumberPattern">
     </string-array>
+
+    <!-- The orientation in which case volume keys should be swapped.
+         See ROTATION_0, ROTATION_90, ROTATION_180, ROTATION_270 in android.view.Surface
+         for more details about values -->
+    <integer name="swap_volume_keys_orientation">-1</integer>
 </resources>
