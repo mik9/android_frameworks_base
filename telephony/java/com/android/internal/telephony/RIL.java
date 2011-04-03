@@ -1552,7 +1552,9 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
                     + " " + operatorNumeric);
 
+        rr.mp.writeInt(2);
         rr.mp.writeString(operatorNumeric);
+        rr.mp.writeString("NOCHANGE");
 
         send(rr);
     }
