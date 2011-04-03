@@ -1560,6 +1560,22 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
+    setNetworkSelectionModeManual(String operatorNumeric, String operatorRAT, Message response) {
+        RILRequest rr
+                = RILRequest.obtain(RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL,
+                                    response);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                    + " " + operatorNumeric);
+
+        rr.mp.writeInt(2);
+        rr.mp.writeString(operatorNumeric);
+        rr.mp.writeString(operatorRAT);
+
+        send(rr);
+    }
+
+    public void
     getNetworkSelectionMode(Message response) {
         RILRequest rr
                 = RILRequest.obtain(RIL_REQUEST_QUERY_NETWORK_SELECTION_MODE,
@@ -3009,7 +3025,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                     strings[i+0],
                     strings[i+1],
                     strings[i+2],
-                    strings[i+3]));
+                    strings[i+3],
+                    strings[i+4]));
         }
 
         return ret;
