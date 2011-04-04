@@ -267,12 +267,13 @@ extends Layout
                 // Do mirroring for right-to-left segments
 
                 for (int i = 0; i < n; i++) {
-                    if (chdirs[i] == Character.DIRECTIONALITY_RIGHT_TO_LEFT) {
+                    if (chdirs[i] == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
+                        chdirs[i] == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC) {
                         int j;
 
                         for (j = i; j < n; j++) {
-                            if (chdirs[j] !=
-                                Character.DIRECTIONALITY_RIGHT_TO_LEFT)
+                            if (chdirs[j] != Character.DIRECTIONALITY_RIGHT_TO_LEFT &&
+                                chdirs[j] != Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC)
                                 break;
                         }
 
@@ -650,7 +651,8 @@ extends Layout
             // Heuristic - LTR unless paragraph contains any RTL chars
             dir = DIR_LEFT_TO_RIGHT;
             for (int j = 0; j < n; j++) {
-                if (chInfo[j] == Character.DIRECTIONALITY_RIGHT_TO_LEFT) {
+                if (chInfo[j] == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
+                    chInfo[j] == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC) {
                     dir = DIR_RIGHT_TO_LEFT;
                     break;
                 }
@@ -738,7 +740,8 @@ extends Layout
             // add condition if the separator is a space
             else if (isSpace && prev != SOR &&
                             (   next == Character.DIRECTIONALITY_EUROPEAN_NUMBER
-                             || next == Character.DIRECTIONALITY_ARABIC_NUMBER  ) ) {
+                             || next == Character.DIRECTIONALITY_ARABIC_NUMBER
+                             || next == Character.DIRECTIONALITY_OTHER_NEUTRALS) ) {
                 chInfo[j] = SOR;
                 for (int k=j+1; k < n; ++k) {
                     if (chInfo[k] == Character.DIRECTIONALITY_LEFT_TO_RIGHT) {
@@ -824,6 +827,8 @@ extends Layout
             } else if (d == Character.DIRECTIONALITY_EUROPEAN_NUMBER ||
                        d == Character.DIRECTIONALITY_ARABIC_NUMBER) {
                 cur = Character.DIRECTIONALITY_LEFT_TO_RIGHT;
+            } else if (d == Character.DIRECTIONALITY_OTHER_NEUTRALS) {
+               chInfo[j] = cur = SOR;
             } else {
                 byte dd = SOR;
                 int k;
@@ -832,7 +837,8 @@ extends Layout
                     dd = chInfo[k];
 
                     if (dd == Character.DIRECTIONALITY_LEFT_TO_RIGHT ||
-                        dd == Character.DIRECTIONALITY_RIGHT_TO_LEFT) {
+                        dd == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
+                        dd == Character.DIRECTIONALITY_OTHER_NEUTRALS) {
                         break;
                     }
                     if (dd == Character.DIRECTIONALITY_EUROPEAN_NUMBER ||
