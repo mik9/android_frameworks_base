@@ -69,30 +69,25 @@ public class Styled
         paint.baselineShift = 0;
         workPaint.set(paint);
 
-        if (spans.length > 0) {
-            for (int i = 0; i < spans.length; i++) {
-                CharacterStyle span = spans[i];
+		if (spans.length > 0) {
+			for (int i = 0; i < spans.length; i++) {
+				CharacterStyle span = spans[i];
 
-                if (span instanceof ReplacementSpan) {
-                    replacement = (ReplacementSpan)span;
-                }
-                else {
-                    span.updateDrawState(workPaint);
-                }
-            }
-        }
+				if (span instanceof ReplacementSpan) {
+					replacement = (ReplacementSpan)span;
+				}
+				else {
+					span.updateDrawState(workPaint);
+				}
+			}
+		}
 
         if (replacement == null) {
             CharSequence tmp;
             int tmpstart, tmpend;
 
             if (runIsRtl) {
-                // if the text has RTL characters then it will be reversed when mirrored:
-                if (TextUtils.hasRTLCharacters(text,start,end))
-                    tmp = text.subSequence(start,end);
-                else // otherwise we need to reverse it here:
-                    tmp = TextUtils.getReverse(text, start, end);
-
+                tmp = TextUtils.getReverse(text, start, end);
                 tmpstart = 0;
                 // XXX: assumes getReverse doesn't change the length of the text
                 tmpend = end - start;
@@ -134,7 +129,7 @@ public class Styled
                     }
 
                     canvas.drawText(tmp, tmpstart, tmpend,
-                                    x - ret, y + workPaint.baselineShift, workPaint);
+                                    x - ret, y + workPaint.baselineShift, workPaint,false);
                 } else {
                     if (needWidth) {
                         if (!haveWidth) {
@@ -144,7 +139,7 @@ public class Styled
                     }
 
                     canvas.drawText(tmp, tmpstart, tmpend,
-                                    x, y + workPaint.baselineShift, workPaint);
+                                    x, y + workPaint.baselineShift, workPaint,false);
                 }
             } else {
                 if (needWidth && !haveWidth) {
@@ -195,19 +190,19 @@ public class Styled
         MetricAffectingSpan[] spans =
             text.getSpans(start, end, MetricAffectingSpan.class);
 
-        ReplacementSpan replacement = null;
+		ReplacementSpan replacement = null;
         workPaint.set(paint);
-
-        for (int i = 0; i < spans.length; i++) {
-            MetricAffectingSpan span = spans[i];
-            if (span instanceof ReplacementSpan) {
-                replacement = (ReplacementSpan)span;
-            }
-            else {
-                span.updateMeasureState(workPaint);
-            }
-        }
-
+		
+		for (int i = 0; i < spans.length; i++) {
+			MetricAffectingSpan span = spans[i];
+			if (span instanceof ReplacementSpan) {
+				replacement = (ReplacementSpan)span;
+			}
+			else {
+				span.updateMeasureState(workPaint);
+			}
+		}
+	
         int result;
         if (replacement == null) {
             workPaint.getFontMetricsInt(fmi);
@@ -258,12 +253,7 @@ public class Styled
             float ret = 0;
 
             if (runIsRtl) {
-                CharSequence tmp;
-                // if the text has RTL characters then it will be reversed when mirrored:
-                if (TextUtils.hasRTLCharacters(text,start,end))
-                    tmp = text.subSequence(start,end);
-                else // otherwise we need to reverse it here:
-                    tmp = TextUtils.getReverse(text, start, end);
+                CharSequence tmp = TextUtils.getReverse(text, start, end);
                 // XXX: this assumes getReverse doesn't tweak the length of
                 // the text
                 int tmpend = end - start;
@@ -273,13 +263,13 @@ public class Styled
 
                 if (canvas != null)
                     canvas.drawText(tmp, 0, tmpend,
-                                    x - ret, y, paint);
+                                    x - ret, y, paint,false);
             } else {
                 if (needWidth)
                     ret = paint.measureText(text, start, end);
 
                 if (canvas != null)
-                    canvas.drawText(text, start, end, x, y, paint);
+                    canvas.drawText(text, start, end, x, y, paint,false);
             }
 
             if (fmi != null) {
@@ -288,7 +278,7 @@ public class Styled
 
             return ret * dir;   // Layout.DIR_RIGHT_TO_LEFT == -1
         }
-
+        
         float ox = x;
         int minAscent = 0, maxDescent = 0, minTop = 0, maxBottom = 0;
 

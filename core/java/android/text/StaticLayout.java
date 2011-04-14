@@ -267,13 +267,12 @@ extends Layout
                 // Do mirroring for right-to-left segments
 
                 for (int i = 0; i < n; i++) {
-                    if (chdirs[i] == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
-                        chdirs[i] == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC) {
+                    if (chdirs[i] == Character.DIRECTIONALITY_RIGHT_TO_LEFT) {
                         int j;
 
                         for (j = i; j < n; j++) {
-                            if (chdirs[j] != Character.DIRECTIONALITY_RIGHT_TO_LEFT &&
-                                chdirs[j] != Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC)
+                            if (chdirs[j] !=
+                                Character.DIRECTIONALITY_RIGHT_TO_LEFT)
                                 break;
                         }
 
@@ -651,8 +650,7 @@ extends Layout
             // Heuristic - LTR unless paragraph contains any RTL chars
             dir = DIR_LEFT_TO_RIGHT;
             for (int j = 0; j < n; j++) {
-                if (chInfo[j] == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
-                    chInfo[j] == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC) {
+                if (chInfo[j] == Character.DIRECTIONALITY_RIGHT_TO_LEFT) {
                     dir = DIR_RIGHT_TO_LEFT;
                     break;
                 }
