@@ -47,8 +47,6 @@ import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.VolumePanel;
-import android.view.WindowManager;
-import android.view.Display;
 import android.os.SystemProperties;
 
 import com.android.internal.telephony.ITelephony;
@@ -62,8 +60,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
-
-import static android.provider.Settings.System.SWAP_VOLUME_KEYS_ORIENTATION;
 
 /**
  * The implementation of the volume manager service.
@@ -186,7 +182,6 @@ public class AudioService extends IAudioService.Stub {
         AudioSystem.STREAM_MUSIC,  // STREAM_TTS
         AudioSystem.STREAM_MUSIC  // STREAM_FM
     };
-    static Display mDisplay = null;
 
     private AudioSystem.ErrorCallback mAudioSystemCallback = new AudioSystem.ErrorCallback() {
         public void onError(int error) {
@@ -325,8 +320,6 @@ public class AudioService extends IAudioService.Stub {
         TelephonyManager tmgr = (TelephonyManager)
                 context.getSystemService(Context.TELEPHONY_SERVICE);
         tmgr.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
-        
-        mDisplay = ((WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
     }
 
     private void createAudioSystemThread() {
@@ -436,15 +429,6 @@ public class AudioService extends IAudioService.Stub {
         ensureValidDirection(direction);
         ensureValidStreamType(streamType);
 
-        if (mDisplay != null) {
-            int currentOrientation = mDisplay.getRotation();
-            int swapOrientation = Settings.System.getInt(mContext.getContentResolver(),
-                SWAP_VOLUME_KEYS_ORIENTATION,
-                mContext.getResources().getInteger(com.android.internal.R.integer.swap_volume_keys_orientation));
-            if (currentOrientation == swapOrientation) {
-                direction = -direction;
-            }
-        }
 
         VolumeStreamState streamState = mStreamStates[STREAM_VOLUME_ALIAS[streamType]];
         final int oldIndex = (streamState.muteCount() != 0) ? streamState.mLastAudibleIndex : streamState.mIndex;
