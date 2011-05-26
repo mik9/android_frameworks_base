@@ -172,19 +172,18 @@ public class CmBatteryMiniIcon extends ImageView {
             String action = intent.getAction();
             if (action.equals(Intent.ACTION_BATTERY_CHANGED)) {
                 mBatteryLevel = intent.getIntExtra("level", 0);
-                if (mBatteryPlugged && mBatteryPlugged == 100) {
+                if (mBatteryPlugged && mBatteryLevel == 100) {
                     mHandler.removeCallbacks(onFakeTimer);
                     invalidate();
                 }
             } else if (action.equals(Intent.ACTION_POWER_CONNECTED)) {
                 mBatteryPlugged = true;
+                mHandler.removeCallbacks(onFakeTimer);
                 mHandler.postDelayed(onFakeTimer, ANIM_TIMER_DURATION);
             } else if (action.equals(Intent.ACTION_POWER_DISCONNECTED)) {
                 mBatteryPlugged = false;
-                if (mBatteryLevel < 100) {
-                    mHandler.removeCallbacks(onFakeTimer);
-                    invalidate();
-                }
+                mHandler.removeCallbacks(onFakeTimer);
+                invalidate();
             }
         }
     };
