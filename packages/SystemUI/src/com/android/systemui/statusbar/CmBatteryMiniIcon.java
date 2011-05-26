@@ -171,13 +171,17 @@ public class CmBatteryMiniIcon extends ImageView {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (action.equals(Intent.ACTION_BATTERY_CHANGED)) {
-                // mIconId = intent.getIntExtra("icon-small", 0);
                 mBatteryLevel = intent.getIntExtra("level", 0);
-                mBatteryPlugged = intent.getIntExtra("plugged", 0) != 0;
-
-                if (mBatteryPlugged && mBatteryLevel < 100)
-                    mHandler.postDelayed(onFakeTimer, ANIM_TIMER_DURATION);
-                else{
+                if (mBatteryPlugged && mBatteryPlugged == 100) {
+                    mHandler.removeCallbacks(onFakeTimer);
+                    invalidate();
+                }
+            } else if (action.equals(Intent.ACTION_POWER_CONNECTED)) {
+                mBatteryPlugged = true;
+                mHandler.postDelayed(onFakeTimer, ANIM_TIMER_DURATION);
+            } else if (action.equals(Intent.ACTION_POWER_DISCONNECTED)) {
+                mBatteryPlugged = false;
+                if (mBatteryLevel < 100) {
                     mHandler.removeCallbacks(onFakeTimer);
                     invalidate();
                 }
@@ -197,13 +201,13 @@ public class CmBatteryMiniIcon extends ImageView {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        if (!mAttached)
-            return;
-        if (!mShowCmBattery)
+        if (!mAttached || !mShowCmBattery)
             return;
 
         // set up animation when charger plugged in
         if (mBatteryPlugged && mBatteryLevel < 100) {
+            int prevFrame = mCurrentFrame;
+
             if (mLastMillis == 0) {
                 // just got plugged - setup animation
                 mLastMillis = SystemClock.uptimeMillis();
@@ -216,6 +220,10 @@ public class CmBatteryMiniIcon extends ImageView {
                 if (mCurrentFrame > 10)
                     mCurrentFrame = mBatteryLevel / 10;
                 mLastMillis += ANIM_FRAME_DURATION;
+            }
+
+            if (mCurrentFrame == prevFrame) {
+                return;
             }
         } else {
             // reset the animation for next charger connection
