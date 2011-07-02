@@ -48,12 +48,6 @@ public class CmBatteryMiniIcon extends ImageView {
     // the margin to the right of this widget
     static final int BATTERY_MINI_ICON_MARGIN_RIGHT_DIP = 6;
 
-    // duration of each frame in charging animation in millis
-    // static final int ANIM_FRAME_DURATION = 750;
-
-    // duration of each fake-timer call to update animation in millis
-    // static final int ANIM_TIMER_DURATION = 333;
-
     // Duration of each frame during battery charging animation
     private int mAnimDuration = 500;
 
@@ -72,11 +66,8 @@ public class CmBatteryMiniIcon extends ImageView {
     // weather to show this battery widget or not
     private boolean mShowCmBattery = false;
 
-    // used for animation
-    private long mLastMillis = 0;
-
-    // used for animation
-    private int mCurrentFrame;
+    // used for animation and still values when not charging/fully charged
+    private int mCurrentFrame = 0;
 
     private boolean mAttached;
 
@@ -183,6 +174,9 @@ public class CmBatteryMiniIcon extends ImageView {
 
     private void stopTimer() {
         mHandler.removeCallbacks(onFakeTimer);
+        // As the battery is charged or it's not charging
+        // apply the current status of the battery.
+        mCurrentFrame = mBatteryLevel / 10;
         invalidate();
     }
 
@@ -226,9 +220,7 @@ public class CmBatteryMiniIcon extends ImageView {
         if (!mAttached || !mShowCmBattery)
             return;
 
-        int frame = (mBatteryPlugged ? mCurrentFrame : mBatteryLevel / 10);
-
-        canvas.drawBitmap(mMiniIconCache[frame], mMatrix, mPaint);
+        canvas.drawBitmap(mMiniIconCache[mCurrentFrame], mMatrix, mPaint);
     }
 
     private int getBatResourceID(int level) {

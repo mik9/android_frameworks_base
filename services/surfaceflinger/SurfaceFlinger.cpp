@@ -2021,7 +2021,9 @@ status_t SurfaceFlinger::turnElectronBeamOffImplLocked(int32_t mode)
     glEnable(GL_SCISSOR_TEST);
     hw.flip( Region(hw.bounds()) );
 
-    //hw.setCanDraw(false);
+#ifndef DO_NOT_SET_CAN_DRAW
+    hw.setCanDraw(false);
+#endif
     return NO_ERROR;
 }
 
@@ -2063,7 +2065,7 @@ status_t SurfaceFlinger::turnElectronBeamOff(int32_t mode)
 status_t SurfaceFlinger::turnElectronBeamOnImplLocked(int32_t mode)
 {
     DisplayHardware& hw(graphicPlane(0).editDisplayHardware());
-#if 0
+#ifndef DO_NOT_SET_CAN_DRAW
     if (hw.canDraw()) {
         // we're already on
         return NO_ERROR;

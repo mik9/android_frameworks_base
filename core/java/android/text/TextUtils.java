@@ -46,6 +46,7 @@ import android.util.Printer;
 
 import com.android.internal.util.ArrayUtils;
 
+import java.text.Normalizer;
 import java.util.regex.Pattern;
 import java.util.Iterator;
 
@@ -846,10 +847,10 @@ public class TextUtils {
     }
 
     public static int getOffsetBefore(CharSequence text, int offset) {
-        if (offset == 0)
+        if (offset <= 1)
             return 0;
-        if (offset == 1)
-            return 0;
+        if (offset > text.length())
+            return text.length();
 
         char c = text.charAt(offset - 1);
 
@@ -861,7 +862,21 @@ public class TextUtils {
             else
                 offset -= 1;
         } else {
+            String decomposed = Normalizer.normalize(Character.toString(c), Normalizer.Form.NFKD);
+
             offset -= 1;
+            c = decomposed.charAt(0);
+
+            while (Character.getDirectionality(c) == Character.DIRECTIONALITY_NONSPACING_MARK) {
+                offset -= 1;
+
+                if (offset == 0)
+                    break;
+
+                decomposed = Normalizer.normalize(text.subSequence(offset, offset + 1),
+                                                    Normalizer.Form.NFKD);
+                c = decomposed.charAt(0);
+            }
         }
 
         if (text instanceof Spanned) {
@@ -883,10 +898,10 @@ public class TextUtils {
     public static int getOffsetAfter(CharSequence text, int offset) {
         int len = text.length();
 
-        if (offset == len)
+        if (offset >= len-1)
             return len;
-        if (offset == len - 1)
-            return len;
+        if (offset < 0)
+            return 0;
 
         char c = text.charAt(offset);
 
@@ -899,6 +914,18 @@ public class TextUtils {
                 offset += 1;
         } else {
             offset += 1;
+
+            do {
+                String decomposed = Normalizer.normalize(text.subSequence(offset, offset + 1),
+                                                        Normalizer.Form.NFKD);
+
+                c = decomposed.charAt(0);
+
+                if (Character.getDirectionality(c) != Character.DIRECTIONALITY_NONSPACING_MARK)
+                    break;
+
+                offset += 1;
+            } while (offset < len);
         }
 
         if (text instanceof Spanned) {
