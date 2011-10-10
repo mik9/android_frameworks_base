@@ -543,7 +543,7 @@ public class StatusBarService extends Service implements CommandQueue.Callbacks 
                 WindowManager.LayoutParams.TYPE_STATUS_BAR,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                     | WindowManager.LayoutParams.FLAG_TOUCHABLE_WHEN_WAKING,
-                PixelFormat.RGBX_8888);
+                PixelFormat.TRANSLUCENT);
         lp.gravity = Gravity.TOP | Gravity.FILL_HORIZONTAL;
         lp.setTitle("StatusBar");
         lp.windowAnimations = com.android.internal.R.style.Animation_StatusBar;
@@ -921,6 +921,7 @@ public class StatusBarService extends Service implements CommandQueue.Callbacks 
 
         if (!mTicking) {
             setDateViewVisibility(true, com.android.internal.R.anim.fade_in);
+            setNotificationIconVisibility(false, com.android.internal.R.anim.fade_out);
         }
     }
 

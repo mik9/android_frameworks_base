@@ -49,6 +49,7 @@ public final class DateView extends TextView {
 
     public DateView(Context context, AttributeSet attrs) {
         super(context, attrs);
+        this.setBackgroundColor(0x00000000);
     }
 
     @Override
