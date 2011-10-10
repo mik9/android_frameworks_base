@@ -2022,9 +2022,15 @@ status_t SurfaceFlinger::turnElectronBeamOffImplLocked(int32_t mode)
     glEnable(GL_SCISSOR_TEST);
     hw.flip( Region(hw.bounds()) );
 
-#ifndef DO_NOT_SET_CAN_DRAW
-    hw.setCanDraw(false);
-#endif
+    /*
+     * If ElectronBeamAnimationOn is disabled no one can set
+     * canDraw to true which gives blank screen as a result of unlock
+     * on some phones.
+     */
+    if (mode & ISurfaceComposer::eElectronBeamAnimationOn) {
+        hw.setCanDraw(false);
+    }
+
     return NO_ERROR;
 }
 
@@ -2066,12 +2072,10 @@ status_t SurfaceFlinger::turnElectronBeamOff(int32_t mode)
 status_t SurfaceFlinger::turnElectronBeamOnImplLocked(int32_t mode)
 {
     DisplayHardware& hw(graphicPlane(0).editDisplayHardware());
-#ifndef DO_NOT_SET_CAN_DRAW
     if (hw.canDraw()) {
         // we're already on
         return NO_ERROR;
     }
-#endif
     if (mode & ISurfaceComposer::eElectronBeamAnimationOn) {
         electronBeamOnAnimationImplLocked();
     }
