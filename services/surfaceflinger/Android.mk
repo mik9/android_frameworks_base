@@ -24,8 +24,6 @@ ifeq ($(TARGET_BOARD_PLATFORM), omap3)
 	LOCAL_CFLAGS += -DNO_RGBX_8888
 endif
 
-endif
-
 ifeq ($(BOARD_NO_RGBX_8888), true)
 	LOCAL_CFLAGS += -DNO_RGBX_8888
 endif
