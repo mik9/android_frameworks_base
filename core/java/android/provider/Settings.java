@@ -1903,6 +1903,18 @@ public final class Settings {
         public static final String USER_DEFINED_KEY3_APP = "user_defined_key3_app";
 
         /**
+         * Stores the uri of the define application for the envelope key
+         * @hide
+         */
+        public static final String USER_DEFINED_KEY_ENVELOPE = "user_defined_key_envelope";
+
+        /**
+         * Stores the uri of the define application for the explorer key
+         * @hide
+         */
+        public static final String USER_DEFINED_KEY_EXPLORER = "user_defined_key_explorer";
+
+        /**
          * Specifies whether to prompt on the power dialog
          * @hide
          */
@@ -2438,6 +2450,14 @@ public final class Settings {
         public static final String STATUS_BAR_BRIGHTNESS_TOGGLE = "status_bar_brightness_toggle";
 
         /**
+         * Whether to display headset icon on status bar when headset is plugged in
+         * 0: headset icon is never displayed
+         * 1: headset icon is displayed when headset is plugged in
+         * @hide
+         */
+        public static final String STATUS_BAR_HEADSET = "status_bar_headset";
+
+        /**
          * Whether to wake the screen with the trackball. The value is boolean (1 or 0).
          * @hide
          */
@@ -2481,12 +2501,29 @@ public final class Settings {
         public static final String LOCKSCREEN_CUSTOM_APP_ACTIVITY = "lockscreen_custom_app_activity";
 
         /**
+         * Ring Apps to launch with ring style and custom app toggle enabled
+         * @hide
+         */
+        public static final String[] LOCKSCREEN_CUSTOM_RING_APP_ACTIVITIES = new String[] {
+            "lockscreen_custom_app_activity_1",
+            "lockscreen_custom_app_activity_2",
+            "lockscreen_custom_app_activity_3",
+            "lockscreen_custom_app_activity_4"
+        };
+
+        /**
          * 1: Show custom app icon (currently cm logo) as with new patch
          * 2: Show messaging app icon as in old lockscreen
          * possibly more in the future (if more png files are drawn)
          * @hide
          */
         public static final String LOCKSCREEN_CUSTOM_ICON_STYLE = "lockscreen_custom_icon_style";
+
+        /**
+         * Modify lockscreen widgets layout (time,date,carrier,msg,status)
+         * @hide
+         */
+        public static final String LOCKSCREEN_WIDGETS_LAYOUT = "lockscreen_widgets_layout";
 
         /**
          * When enabled, rotary lockscreen switches app starter and unlock, so you can drag down to unlock
@@ -2549,22 +2586,11 @@ public final class Settings {
          public static final String TRACKBALL_NOTIFICATION_BLEND_COLOR = "trackball_blend_color";
 
         /**
-         * Trackball Notification Colors. The value is String  pkg=color|pkg=color
+         * Trackball Notification Colors. The value is a String, containing a list of packages:
+         * pkg=color=blink=mode=category|pkg=color=blink=mode=category|...
          * @hide
          */
-        public static final String NOTIFICATION_PACKAGE_COLORS = "|";
-
-        /**
-         * Trackball Notification List. The value is String  pkg|pkg
-         * @hide
-         */
-        public static final String NOTIFICATION_PACKAGE_LIST = "|";
-
-        /**
-         * Trackball Notification Colors Debugging. The value is boolean (1 or 0)
-         * @hide
-         */
-        public static final String NOTIFICATION_PACKAGE_COLORS_GET_PACK = "0";
+        public static final String NOTIFICATION_PACKAGE_COLORS = "notification_custom_led_colors";
 
         /**
          * Whether to unlock the menu key.  The value is boolean (1 or 0).
@@ -2613,6 +2639,30 @@ public final class Settings {
          * @hide
          */
         public static final String LOCKSCREEN_ALWAYS_BATTERY = "lockscreen_always_battery";
+
+        /**
+         * Whether to show the next calendar event
+         * @hide
+         */
+        public static final String LOCKSCREEN_CALENDAR_ALARM = "lockscreen_calendar_alarm";
+
+        /**
+         * Which calendars to look for events
+         * @hide
+         */
+        public static final String LOCKSCREEN_CALENDARS = "lockscreen_calendars";
+
+        /**
+         * How far in the future to look for events
+         * @hide
+         */
+        public static final String LOCKSCREEN_CALENDAR_LOOKAHEAD = "lockscreen_calendar_lookahead";
+
+        /**
+         * Whether to find only events with reminders
+         * @hide
+         */
+        public static final String LOCKSCREEN_CALENDAR_REMINDERS_ONLY = "lockscreen_calendar_reminders_only";
 
         /**
          * Whether to use lockscreen music controls

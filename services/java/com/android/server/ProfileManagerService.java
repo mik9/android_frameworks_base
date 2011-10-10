@@ -23,35 +23,93 @@ import org.xmlpull.v1.XmlPullParserFactory;
 import android.app.IProfileManager;
 import android.app.NotificationGroup;
 import android.app.Profile;
+import android.app.ProfileGroup;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.XmlResourceParser;
 import android.os.RemoteException;
 import android.text.TextUtils;
 import android.util.Log;
+import android.os.ParcelUuid;
 
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /** {@hide} */
 public class ProfileManagerService extends IProfileManager.Stub {
+    // Enable the below for detailed logging of this class
+    private static final boolean LOCAL_LOGV = false;
+    /**
+     * <p>Broadcast Action: A new profile has been selected. This can be triggered by the user
+     * or by calls to the ProfileManagerService / Profile.</p>
+     * @hide
+     */
+    public static final String INTENT_ACTION_PROFILE_SELECTED = "android.intent.action.PROFILE_SELECTED";
+
+    public static final String PERMISSION_CHANGE_SETTINGS = "android.permission.WRITE_SETTINGS";
 
     private static final String PROFILE_FILENAME = "/data/system/profiles.xml";
 
     private static final String TAG = "ProfileService";
 
-    private Map<String, Profile> mProfiles = new HashMap<String, Profile>();
+    private Map<UUID, Profile> mProfiles;
 
-    private Map<String, NotificationGroup> mGroups = new HashMap<String, NotificationGroup>();
+    // Match UUIDs and names, used for reverse compatibility
+    private Map<String, UUID> mProfileNames;
+
+    private Map<UUID, NotificationGroup> mGroups;
 
     private Profile mActiveProfile;
 
+    // Well-known UUID of the wildcard group
+    private static final UUID mWildcardUUID = UUID.fromString("a126d48a-aaef-47c4-baed-7f0e44aeffe5");
+    private NotificationGroup mWildcardGroup;
+
     private Context mContext;
+    private boolean mDirty;
+
+    private BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            if (action.equals(Intent.ACTION_LOCALE_CHANGED)) {
+                persistIfDirty();
+                initialize();
+            } else if (action.equals(Intent.ACTION_SHUTDOWN)) {
+                persistIfDirty();
+            }
+        }
+    };
 
     public ProfileManagerService(Context context) {
         mContext = context;
+
+        mWildcardGroup = new NotificationGroup(
+                context.getString(com.android.internal.R.string.wildcardProfile),
+                com.android.internal.R.string.wildcardProfile,
+                mWildcardUUID);
+
+        initialize();
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(Intent.ACTION_LOCALE_CHANGED);
+        filter.addAction(Intent.ACTION_SHUTDOWN);
+        mContext.registerReceiver(mIntentReceiver, filter);
+    }
+
+    private void initialize() {
+        mProfiles = new HashMap<UUID, Profile>();
+        mProfileNames = new HashMap<String, UUID>();
+        mGroups = new HashMap<UUID, NotificationGroup>();
+        mDirty = false;
+
         try {
             loadFromFile();
         } catch (RemoteException e) {
@@ -71,39 +129,143 @@ public class ProfileManagerService extends IProfileManager.Stub {
         }
     }
 
-    // TODO: Could do with returning true/false to convert to exception
-    // TODO: Exceptions not supported in aidl.
     @Override
-    public void setActiveProfile(String profileName) throws RemoteException {
-        setActiveProfile(profileName, true);
-    }
-
-    private void setActiveProfile(String profileName, boolean doinit) throws RemoteException {
-        if(mProfiles.containsKey(profileName)){
-            Log.d(TAG, "Set active profile to: " + profileName);
-            mActiveProfile = getProfile(profileName);
-            if(doinit){
-                mActiveProfile.doSelect(mContext);
-            }
-        }else{
-            Log.e(TAG, "Cannot set active profile to: " + profileName + " - does not exist.");
+    @Deprecated
+    public boolean setActiveProfileByName(String profileName) throws RemoteException, SecurityException {
+        if (mProfileNames.containsKey(profileName)) {
+            if (LOCAL_LOGV) Log.v(TAG, "setActiveProfile(String) found profile name in mProfileNames.");
+            return setActiveProfile(mProfiles.get(mProfileNames.get(profileName)), true);
+        } else {
+            // Since profileName could not be casted into a UUID, we can call it a string.
+            Log.w(TAG, "Unable to find profile to set active, based on string: " + profileName);
+            return false;
         }
     }
 
     @Override
-    public void addProfile(Profile profile) throws RemoteException {
+    public boolean setActiveProfile(ParcelUuid profileParcelUuid) throws RemoteException, SecurityException {
+        UUID profileUuid = profileParcelUuid.getUuid();
+        if(mProfiles.containsKey(profileUuid)){
+            if (LOCAL_LOGV) Log.v(TAG, "setActiveProfileByUuid(ParcelUuid) found profile UUID in mProfileNames.");
+            return setActiveProfile(mProfiles.get(profileUuid), true);
+        } else {
+            Log.e(TAG, "Cannot set active profile to: " + profileUuid.toString() + " - does not exist.");
+            return false;
+        }
+    }
+
+    private boolean setActiveProfile(UUID profileUuid, boolean doinit) throws RemoteException {
+        if(mProfiles.containsKey(profileUuid)){
+            if (LOCAL_LOGV) Log.v(TAG, "setActiveProfile(UUID, boolean) found profile UUID in mProfiles.");
+            return setActiveProfile(mProfiles.get(profileUuid), doinit);
+        } else {
+            Log.e(TAG, "Cannot set active profile to: " + profileUuid.toString() + " - does not exist.");
+            return false;
+        }
+    }
+
+    private boolean setActiveProfile(Profile newActiveProfile, boolean doinit) throws RemoteException {
+        /*
+         * NOTE: Since this is not a public function, and all public functions
+         * take either a string or a UUID, the active profile should always be
+         * in the collection.  If writing another setActiveProfile which receives
+         * a Profile object, run enforceChangePermissions, add the profile to the
+         * list, and THEN add it.
+         */
+
+        try {
+            enforceChangePermissions();
+            Log.d(TAG, "Set active profile to: " + newActiveProfile.getUuid().toString() + " - " + newActiveProfile.getName());
+            Profile lastProfile = mActiveProfile;
+            mActiveProfile = newActiveProfile;
+            mDirty = true;
+            if (doinit) {
+                if (LOCAL_LOGV) Log.v(TAG, "setActiveProfile(Profile, boolean) - Running init");
+
+                /*
+                 * We need to clear the caller's identity in order to
+                 * - allow the profile switch to execute actions not included in the caller's permissions
+                 * - broadcast INTENT_ACTION_PROFILE_SELECTED
+                 */
+                long token = clearCallingIdentity();
+
+                // Call profile's "doSelect"
+                mActiveProfile.doSelect(mContext);
+
+                // Notify other applications of newly selected profile.
+                Intent broadcast = new Intent(INTENT_ACTION_PROFILE_SELECTED);
+                broadcast.putExtra("name", mActiveProfile.getName());
+                broadcast.putExtra("uuid", mActiveProfile.getUuid().toString());
+                broadcast.putExtra("lastName", lastProfile.getName());
+                broadcast.putExtra("lastUuid", lastProfile.getUuid().toString());
+                mContext.sendBroadcast(broadcast);
+
+                restoreCallingIdentity(token);
+                persistIfDirty();
+            }
+            return true;
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return false;
+        }
+    }
+
+    @Override
+    public boolean addProfile(Profile profile) throws RemoteException, SecurityException {
+        enforceChangePermissions();
+        addProfileInternal(profile);
+        persistIfDirty();
+        return true;
+    }
+
+    private void addProfileInternal(Profile profile) {
         // Make sure this profile has all of the correct groups.
         for (NotificationGroup group : mGroups.values()) {
-            profile.ensureProfileGroup(group.getName());
+            ensureGroupInProfile(profile, group, false);
         }
-        profile.ensureProfileGroup(
-                mContext.getString(com.android.internal.R.string.wildcardProfile), true);
-        mProfiles.put(profile.getName(), profile);
+        ensureGroupInProfile(profile, mWildcardGroup, true);
+        mProfiles.put(profile.getUuid(), profile);
+        mProfileNames.put(profile.getName(), profile.getUuid());
+        mDirty = true;
+    }
+
+    private void ensureGroupInProfile(Profile profile, NotificationGroup group, boolean defaultGroup) {
+        if (profile.getProfileGroup(group.getUuid()) != null) {
+            return;
+        }
+
+        /* enforce a matchup between profile and notification group, which not only
+         * works by UUID, but also by name for backwards compatibility */
+        for (ProfileGroup pg : profile.getProfileGroups()) {
+            if (pg.matches(group, defaultGroup)) {
+                return;
+            }
+        }
+
+        /* didn't find any, create new group */
+        profile.addProfileGroup(new ProfileGroup(group.getUuid(), defaultGroup));
     }
 
     @Override
-    public Profile getProfile(String profileName) throws RemoteException {
-        return mProfiles.get(profileName);
+    @Deprecated
+    public Profile getProfileByName(String profileName) throws RemoteException {
+        if (mProfileNames.containsKey(profileName)) {
+            return mProfiles.get(mProfileNames.get(profileName));
+        } else if (mProfiles.containsKey(UUID.fromString((profileName)))) {
+            return mProfiles.get(UUID.fromString(profileName));
+        } else {
+            return null;
+        }
+    }
+
+    @Override
+    public Profile getProfile(ParcelUuid profileParcelUuid) {
+        UUID profileUuid = profileParcelUuid.getUuid();
+        return mProfiles.get(profileUuid);
+    }
+
+    public Profile getProfile(UUID profileUuid) {
+        return mProfiles.get(profileUuid);
     }
 
     @Override
@@ -117,8 +279,39 @@ public class ProfileManagerService extends IProfileManager.Stub {
     }
 
     @Override
-    public void removeProfile(Profile profile) throws RemoteException {
-        mProfiles.remove(profile.getName());
+    public boolean removeProfile(Profile profile) throws RemoteException, SecurityException {
+        enforceChangePermissions();
+        if (mProfileNames.remove(profile.getName()) != null && mProfiles.remove(profile.getUuid()) != null) {
+            mDirty = true;
+            persistIfDirty();
+            return true;
+        } else{
+            return false;
+        }
+    }
+
+    @Override
+    public void updateProfile(Profile profile) throws RemoteException, SecurityException {
+        enforceChangePermissions();
+        Profile old = mProfiles.get(profile.getUuid());
+        if (old != null) {
+            mProfileNames.remove(old.getName());
+            mProfileNames.put(profile.getName(), profile.getUuid());
+            mProfiles.put(profile.getUuid(), profile);
+            /* no need to set mDirty, if the profile was actually changed,
+             * it's marked as dirty by itself */
+            persistIfDirty();
+        }
+    }
+
+    @Override
+    public boolean profileExists(ParcelUuid profileUuid) throws RemoteException {
+        return mProfiles.containsKey(profileUuid.getUuid());
+    }
+
+    @Override
+    public boolean profileExistsByName(String profileName) throws RemoteException {
+        return mProfileNames.containsKey(profileName);
     }
 
     @Override
@@ -127,23 +320,44 @@ public class ProfileManagerService extends IProfileManager.Stub {
     }
 
     @Override
-    public void addNotificationGroup(NotificationGroup group) throws RemoteException {
-        if (mGroups.put(group.getName(), group) == null) {
+    public void addNotificationGroup(NotificationGroup group) throws RemoteException, SecurityException {
+        enforceChangePermissions();
+        addNotificationGroupInternal(group);
+        persistIfDirty();
+    }
+
+    private void addNotificationGroupInternal(NotificationGroup group) {
+        if (mGroups.put(group.getUuid(), group) == null) {
             // If the above is true, then the ProfileGroup shouldn't exist in
             // the profile. Ensure it is added.
             for (Profile profile : mProfiles.values()) {
-                profile.ensureProfileGroup(group.getName());
+                ensureGroupInProfile(profile, group, false);
             }
         }
+        mDirty = true;
     }
 
     @Override
-    public void removeNotificationGroup(NotificationGroup group) throws RemoteException {
-        mGroups.remove(group.getName());
+    public void removeNotificationGroup(NotificationGroup group) throws RemoteException, SecurityException {
+        enforceChangePermissions();
+        mDirty |= (mGroups.remove(group.getUuid()) != null);
         // Remove the corresponding ProfileGroup from all the profiles too if
         // they use it.
         for (Profile profile : mProfiles.values()) {
-            profile.removeProfileGroup(group.getName());
+            profile.removeProfileGroup(group.getUuid());
+        }
+        persistIfDirty();
+    }
+
+    @Override
+    public void updateNotificationGroup(NotificationGroup group) throws RemoteException, SecurityException {
+        enforceChangePermissions();
+        NotificationGroup old = mGroups.get(group.getUuid());
+        if (old != null) {
+            mGroups.put(group.getUuid(), group);
+            /* no need to set mDirty, if the group was actually changed,
+             * it's marked as dirty by itself */
+            persistIfDirty();
         }
     }
 
@@ -162,16 +376,13 @@ public class ProfileManagerService extends IProfileManager.Stub {
         XmlPullParser xpp = xppf.newPullParser();
         FileReader fr = new FileReader(PROFILE_FILENAME);
         xpp.setInput(fr);
-        loadXml(xpp);
+        loadXml(xpp, mContext);
+        fr.close();
+        persistIfDirty();
     }
 
-    private void loadXml(XmlPullParser xpp) throws XmlPullParserException, IOException,
-            RemoteException {
-        loadXml(xpp, null);
-    }
-
-    private void loadXml(XmlPullParser xpp, Context context) throws XmlPullParserException, IOException,
-            RemoteException {
+    private void loadXml(XmlPullParser xpp, Context context) throws
+            XmlPullParserException, IOException, RemoteException {
         int event = xpp.next();
         String active = null;
         while (event != XmlPullParser.END_TAG || !"profiles".equals(xpp.getName())) {
@@ -182,21 +393,34 @@ public class ProfileManagerService extends IProfileManager.Stub {
                     Log.d(TAG, "Found active: " + active);
                 } else if (name.equals("profile")) {
                     Profile prof = Profile.fromXml(xpp, context);
-                    addProfile(prof);
+                    addProfileInternal(prof);
                     // Failsafe if no active found
                     if (active == null) {
-                        active = prof.getName();
+                        active = prof.getUuid().toString();
                     }
                 } else if (name.equals("notificationGroup")) {
                     NotificationGroup ng = NotificationGroup.fromXml(xpp, context);
-                    addNotificationGroup(ng);
+                    addNotificationGroupInternal(ng);
                 }
             }
             event = xpp.next();
         }
         // Don't do initialisation on startup. The AudioManager doesn't exist yet
         // and besides, the volume settings will have survived the reboot.
-        setActiveProfile(active, false);
+        try {
+            // Try / catch block to detect if XML file needs to be upgraded.
+            setActiveProfile(UUID.fromString(active), false);
+        } catch (IllegalArgumentException e) {
+            if (mProfileNames.containsKey(active)) {
+                setActiveProfile(mProfileNames.get(active), false);
+            } else {
+                // Final fail-safe: We must have SOME profile active.
+                // If we couldn't select one by now, we'll pick the first in the set.
+                setActiveProfile(mProfiles.values().iterator().next(), false);
+            }
+            // This is a hint that we probably just upgraded the XML file. Save changes.
+            mDirty = true;
+        }
     }
 
     private void initialiseStructure() throws RemoteException, XmlPullParserException, IOException {
@@ -204,7 +428,8 @@ public class ProfileManagerService extends IProfileManager.Stub {
                 com.android.internal.R.xml.profile_default);
         try {
             loadXml(xml, mContext);
-            persist();
+            mDirty = true;
+            persistIfDirty();
         } finally {
             xml.close();
         }
@@ -212,36 +437,62 @@ public class ProfileManagerService extends IProfileManager.Stub {
 
     private String getXmlString() throws RemoteException {
         StringBuilder builder = new StringBuilder();
-        getXmlString(builder);
+        builder.append("<profiles>\n<active>");
+        builder.append(TextUtils.htmlEncode(getActiveProfile().getUuid().toString()));
+        builder.append("</active>\n");
+
+        for (Profile p : mProfiles.values()) {
+            p.getXmlString(builder, mContext);
+        }
+        for (NotificationGroup g : mGroups.values()) {
+            g.getXmlString(builder, mContext);
+        }
+        builder.append("</profiles>\n");
         return builder.toString();
     }
 
-    private void getXmlString(StringBuilder builder) throws RemoteException {
-        builder.append("<profiles>\n<active>" + TextUtils.htmlEncode(getActiveProfile().getName())
-                + "</active>\n");
-        for (Profile p : mProfiles.values()) {
-            p.getXmlString(builder);
-        }
-        for (NotificationGroup g : mGroups.values()) {
-            g.getXmlString(builder);
-        }
-        builder.append("</profiles>\n");
-    }
-
     @Override
-    public void persist() throws RemoteException {
-        try {
-            FileWriter fw = new FileWriter(PROFILE_FILENAME);
-            fw.write(getXmlString());
-            fw.close();
-        } catch (Throwable e) {
-            e.printStackTrace();
+    public NotificationGroup getNotificationGroup(ParcelUuid uuid) throws RemoteException {
+        if (uuid.getUuid().equals(mWildcardGroup.getUuid())) {
+            return mWildcardGroup;
+        }
+        return mGroups.get(uuid.getUuid());
+    }
+
+    private synchronized void persistIfDirty() {
+        boolean dirty = mDirty;
+        if (!dirty) {
+            for (Profile profile : mProfiles.values()) {
+                if (profile.isDirty()) {
+                    dirty = true;
+                    break;
+                }
+            }
+        }
+        if (!dirty) {
+            for (NotificationGroup group : mGroups.values()) {
+                if (group.isDirty()) {
+                    dirty = true;
+                    break;
+                }
+            }
+        }
+        if (dirty) {
+            try {
+                Log.d(TAG, "Saving profile data...");
+                FileWriter fw = new FileWriter(PROFILE_FILENAME);
+                fw.write(getXmlString());
+                fw.close();
+                Log.d(TAG, "Save completed.");
+                mDirty = false;
+            } catch (Throwable e) {
+                e.printStackTrace();
+            }
         }
     }
 
-    @Override
-    public NotificationGroup getNotificationGroup(String name) throws RemoteException {
-        return mGroups.get(name);
+    private void enforceChangePermissions() throws SecurityException {
+        mContext.enforceCallingOrSelfPermission(PERMISSION_CHANGE_SETTINGS,
+                "You do not have permissions to change the Profile Manager.");
     }
-
 }

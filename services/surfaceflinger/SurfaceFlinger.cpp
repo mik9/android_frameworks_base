@@ -104,7 +104,8 @@ SurfaceFlinger::SurfaceFlinger()
         mBootFinished(false),
         mConsoleSignals(0),
         mSecureFrameBuffer(0),
-        mUseDithering(true)
+        mUseDithering(true),
+        mUse16bppAlpha(false)
 {
     init();
 }
@@ -135,6 +136,10 @@ void SurfaceFlinger::init()
     mRenderColorG = atoi(value);
     property_get("debug.sf.render_color_blue", value, "824");
     mRenderColorB = atoi(value);
+
+    // perf setting for the dynamic 16bpp alpha mode
+    property_get("persist.sys.use_16bpp_alpha", value, "0");
+    mUse16bppAlpha = atoi(value) == 1;
 }
 
 SurfaceFlinger::~SurfaceFlinger()
@@ -1081,10 +1086,13 @@ ssize_t SurfaceFlinger::addClientLayer(const sp<Client>& client,
 
 status_t SurfaceFlinger::removeLayer(const sp<LayerBase>& layer)
 {
+    status_t err = NAME_NOT_FOUND;
     Mutex::Autolock _l(mStateLock);
-    status_t err = purgatorizeLayer_l(layer);
-    if (err == NO_ERROR)
-        setTransactionFlags(eTransactionNeeded);
+    if (layer != 0) {
+        err = purgatorizeLayer_l(layer);
+        if (err == NO_ERROR)
+            setTransactionFlags(eTransactionNeeded);
+    }
     return err;
 }
 
@@ -1105,7 +1113,7 @@ status_t SurfaceFlinger::removeLayer_l(const sp<LayerBase>& layerBase)
 status_t SurfaceFlinger::purgatorizeLayer_l(const sp<LayerBase>& layerBase)
 {
     // remove the layer from the main list (through a transaction).
-    ssize_t err = removeLayer_l(layerBase);
+    status_t err = removeLayer_l(layerBase);
 
     layerBase->onRemoved();
 
@@ -1266,8 +1274,11 @@ sp<ISurface> SurfaceFlinger::createSurface(const sp<Client>& client, int pid,
             params->format = format;
 
 #ifdef NO_RGBX_8888
-            if (params->format == PIXEL_FORMAT_RGBX_8888)
+            if (params->format == PIXEL_FORMAT_RGBX_8888) {
                 params->format = PIXEL_FORMAT_RGBA_8888;
+                //to check, this should no more be usefull here
+                LOGW("surface format changed from RGBX to RGBA for pid %d (%d x %d)", pid, w, h);
+            }
 #endif
 
             if (normalLayer != 0) {
@@ -1294,11 +1305,16 @@ sp<Layer> SurfaceFlinger::createNormalSurface(
         format = PIXEL_FORMAT_RGBA_8888;
         break;
     case PIXEL_FORMAT_OPAQUE:
-#ifdef USE_16BPPSURFACE_FOR_OPAQUE
-        format = PIXEL_FORMAT_RGB_565;
+        if (mUse16bppAlpha) {
+            format = PIXEL_FORMAT_RGB_565;
+            //LOGD("Using 16bpp alpha PIXEL_FORMAT_RGB_565 (window %d x %d)", w, h);
+        } else {
+#ifndef NO_RGBX_8888
+            format = PIXEL_FORMAT_RGBX_8888;
 #else
-        format = PIXEL_FORMAT_RGBX_8888;
+            format = PIXEL_FORMAT_RGBA_8888;
 #endif
+        }
         break;
     }
 
