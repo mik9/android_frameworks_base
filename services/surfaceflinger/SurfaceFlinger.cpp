@@ -104,8 +104,7 @@ SurfaceFlinger::SurfaceFlinger()
         mBootFinished(false),
         mConsoleSignals(0),
         mSecureFrameBuffer(0),
-        mUseDithering(true),
-        mUse16bppAlpha(false)
+        mUseDithering(true)
 {
     init();
 }
@@ -139,7 +138,15 @@ void SurfaceFlinger::init()
 
     // perf setting for the dynamic 16bpp alpha mode
     property_get("persist.sys.use_16bpp_alpha", value, "0");
-    mUse16bppAlpha = atoi(value) == 1;
+    if(atoi(value) == 1) {
+        mOpaqueFormat = PIXEL_FORMAT_RGB_565;
+    } else {
+#ifndef NO_RGBX_8888
+        mOpaqueFormat = PIXEL_FORMAT_RGBX_8888;
+#else
+        mOpaqueFormat = PIXEL_FORMAT_RGBA_8888;
+#endif
+    }
 }
 
 SurfaceFlinger::~SurfaceFlinger()
@@ -1305,16 +1312,7 @@ sp<Layer> SurfaceFlinger::createNormalSurface(
         format = PIXEL_FORMAT_RGBA_8888;
         break;
     case PIXEL_FORMAT_OPAQUE:
-        if (mUse16bppAlpha) {
-            format = PIXEL_FORMAT_RGB_565;
-            //LOGD("Using 16bpp alpha PIXEL_FORMAT_RGB_565 (window %d x %d)", w, h);
-        } else {
-#ifndef NO_RGBX_8888
-            format = PIXEL_FORMAT_RGBX_8888;
-#else
-            format = PIXEL_FORMAT_RGBA_8888;
-#endif
-        }
+        format = mOpaqueFormat;
         break;
     }
 

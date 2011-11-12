@@ -447,7 +447,7 @@ private:
    volatile     int32_t                     mSecureFrameBuffer;
 
                 bool                        mUseDithering;
-                bool                        mUse16bppAlpha;
+                PixelFormat                 mOpaqueFormat;
 };
 
 // ---------------------------------------------------------------------------
