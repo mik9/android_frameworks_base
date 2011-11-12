@@ -63,8 +63,6 @@ public class NetworkInfo implements Parcelable {
         return this.operatorRAT;
     }
 
-
-
     NetworkInfo(String operatorAlphaLong,
                 String operatorAlphaShort,
                 String operatorNumeric,
@@ -75,10 +73,28 @@ public class NetworkInfo implements Parcelable {
         this.operatorAlphaShort = operatorAlphaShort;
         this.operatorNumeric = operatorNumeric;
         this.operatorRAT = operatorRAT;
-
         this.state = state;
     }
 
+    public NetworkInfo(String operatorAlphaLong,
+                String operatorAlphaShort,
+                String operatorNumeric,
+                String stateString) {
+        this (operatorAlphaLong, operatorAlphaShort,
+                operatorNumeric, rilStateToState(stateString));
+    }
+
+    NetworkInfo(String operatorAlphaLong,
+                String operatorAlphaShort,
+                String operatorNumeric,
+                State state) {
+
+        this.operatorAlphaLong = operatorAlphaLong;
+        this.operatorAlphaShort = operatorAlphaShort;
+        this.operatorNumeric = operatorNumeric;
+
+        this.state = state;
+    }
 
     public NetworkInfo(String operatorAlphaLong,
                 String operatorAlphaShort,
