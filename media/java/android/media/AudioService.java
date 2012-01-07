@@ -131,6 +131,7 @@ public class AudioService extends IAudioService.Stub {
      */
     private static final String ACTION_FM_PLUG = "android.intent.action.FM_PLUG";
     private static final String ACTION_FMTX_PLUG = "android.intent.action.FMTX_PLUG";
+    private static final String ACTION_HDMI_PLUG = "android.intent.action.HDMI_PLUG";
     private static final String POWER_MODE = "omap.audio.power";
     private static final String MAIN_MIC_CHOICE = "omap.audio.mic.main";
     private static final String SUB_MIC_CHOICE = "omap.audio.mic.sub";
@@ -253,6 +254,9 @@ public class AudioService extends IAudioService.Stub {
     /** @see System#NOTIFICATIONS_USE_RING_VOLUME */
     private int mNotificationsUseRingVolume;
 
+    // Default volume control media
+    private int mDefaultVolumeMedia;
+
     // Broadcast receiver for device connections intent broadcasts
     private final BroadcastReceiver mReceiver = new AudioServiceBroadcastReceiver();
 
@@ -327,6 +331,7 @@ public class AudioService extends IAudioService.Stub {
         if (SystemProperties.OMAP_ENHANCEMENT) {
             intentFilter.addAction(ACTION_FM_PLUG);
             intentFilter.addAction(ACTION_FMTX_PLUG);
+            intentFilter.addAction(ACTION_HDMI_PLUG);
             intentFilter.addAction(POWER_MODE);
             intentFilter.addAction(MAIN_MIC_CHOICE);
             intentFilter.addAction(SUB_MIC_CHOICE);
@@ -416,6 +421,9 @@ public class AudioService extends IAudioService.Stub {
         if (mNotificationsUseRingVolume == 1) {
             STREAM_VOLUME_ALIAS[AudioSystem.STREAM_NOTIFICATION] = AudioSystem.STREAM_RING;
         }
+
+        mDefaultVolumeMedia = System.getInt(cr,
+                Settings.System.DEFAULT_VOLUME_CONTROL_MEDIA, 0);
         // Each stream will read its own persisted settings
 
         // Broadcast the sticky intent
@@ -448,10 +456,15 @@ public class AudioService extends IAudioService.Stub {
 
         int streamType = getActiveStreamType(suggestedStreamType);
 
-        // Don't play sound on other streams
-        if (streamType != AudioSystem.STREAM_RING && (flags & AudioManager.FLAG_PLAY_SOUND) != 0) {
-            flags &= ~AudioManager.FLAG_PLAY_SOUND;
+ 
+        if ((flags & AudioManager.FLAG_PLAY_SOUND) != 0) {
+            if (!(mDefaultVolumeMedia == 1
+                    && streamType == AudioSystem.STREAM_MUSIC
+                    && !AudioSystem.isStreamActive(AudioSystem.STREAM_MUSIC))
+                    && streamType != AudioSystem.STREAM_RING) {
+                flags &= ~AudioManager.FLAG_PLAY_SOUND;
         }
+}
 
         adjustStreamVolume(streamType, direction, flags);
     }
@@ -1280,7 +1293,7 @@ public class AudioService extends IAudioService.Stub {
             return AudioSystem.STREAM_MUSIC;
         } else if (suggestedStreamType == AudioManager.USE_DEFAULT_STREAM_TYPE) {
             // Log.v(TAG, "getActiveStreamType: Forcing STREAM_RING...");
-            return AudioSystem.STREAM_RING;
+            return (mDefaultVolumeMedia == 0) ? AudioSystem.STREAM_RING : AudioSystem.STREAM_MUSIC;
         } else {
             // Log.v(TAG, "getActiveStreamType: Returning suggested type " + suggestedStreamType);
             return suggestedStreamType;
@@ -1771,6 +1784,8 @@ public class AudioService extends IAudioService.Stub {
                     Settings.System.MODE_RINGER_STREAMS_AFFECTED), false, this);
             mContentResolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.NOTIFICATIONS_USE_RING_VOLUME), false, this);
+            mContentResolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.DEFAULT_VOLUME_CONTROL_MEDIA), false, this);
         }
 
         @Override
@@ -1809,6 +1824,9 @@ public class AudioService extends IAudioService.Stub {
                                 SENDMSG_REPLACE, 1, 1, mStreamStates[AudioSystem.STREAM_NOTIFICATION], 0);
                     }
                 }
+
+                mDefaultVolumeMedia = Settings.System.getInt(mContentResolver,
+                        Settings.System.DEFAULT_VOLUME_CONTROL_MEDIA, 0);
             }
         }
     }
@@ -2010,6 +2028,21 @@ public class AudioService extends IAudioService.Stub {
                                 AudioSystem.DEVICE_STATE_AVAILABLE,
                                 "");
                     }
+                }
+            } else if (SystemProperties.OMAP_ENHANCEMENT && action.equals(ACTION_HDMI_PLUG)) {
+                int state = intent.getIntExtra("state", 0);
+                boolean isConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_AUX_DIGITAL);
+
+                if (state == 0 && isConnected) {
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_AUX_DIGITAL,
+                            AudioSystem.DEVICE_STATE_UNAVAILABLE,
+                            "");
+                    mConnectedDevices.remove(AudioSystem.DEVICE_OUT_AUX_DIGITAL);
+                } else if (state == 1 && !isConnected)  {
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_AUX_DIGITAL,
+                            AudioSystem.DEVICE_STATE_AVAILABLE,
+                            "");
+                    mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_AUX_DIGITAL), "");
                 }
             } else if (action.equals(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED)) {
                 int state = intent.getIntExtra(BluetoothHeadset.EXTRA_AUDIO_STATE,
